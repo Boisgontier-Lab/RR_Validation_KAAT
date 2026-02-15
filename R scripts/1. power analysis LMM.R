@@ -8,16 +8,18 @@
 rm(list=ls())
 
 ############################################################
-## INSTALL & LOAD PACKAGES, SET THE PATH
+## 0) INSTALL & LOAD PACKAGES, SET THE PATH
 ############################################################
 
 packages <- c("plyr", "dplyr", "lme4", "lmerTest", "simr")
 to_install <- packages[!(packages %in% installed.packages()[,"Package"])]
 if(length(to_install)) install.packages(to_install)
-lapply(packages, library, character.only = TRUE)
+invisible(lapply(packages, library, character.only = TRUE))
 
+# Ensure simr uses Satterthwaite df via lmerTest for method="t"
+simr::simrOptions(lmerTestDdf = "Satterthwaite")
 
-path_dir <- "YOUR_PATH" # UPDATE YOUR PATH HERE
+path_dir <- "C:/Users/franc/OneDrive - University of Ottawa/Doctorat Ottawa/3 - Article editing/AAT validation study/Registered report/2018_Cheval_code and data"
 raw_file <- file.path(path_dir, "raw_data_eprime_zen.csv")
 
 ############################################################
@@ -27,10 +29,10 @@ dataMT <- read.csv(raw_file, sep=";", stringsAsFactors = FALSE)
 dataMT$image <- as.character(dataMT$image)
 
 ############################################################
-## 2) IMAGE LISTS (Similar Cheval et al. (2018))
+## 2) IMAGE LISTS — same as Cheval
 ## - 5 PA targets
 ## - 5 SED targets
-## - 20 neutral images (10 scenes × 2 r/c renderings)
+## - 20 neutral files (10 scenes × 2 versions r/c)
 ############################################################
 PA_set <- c("AP-COUR.jpg","AP-FOOT.jpg","AP-NAT.jpg","AP-RANDO.jpg","AP-VEL.jpg")
 SB_set <- c("SED-CANAP.jpg","SED-HAMAC.jpg","SED-JVID.jpg","SED-LECT.jpg","SED-TV.jpg")
@@ -44,7 +46,7 @@ neutral_c <- c("AP-COURc.jpg","AP-FOOTc.jpg","AP-NATc.jpg","AP-RANDOc.jpg","AP-V
 neutral_all <- c(neutral_r, neutral_c)
 
 ############################################################
-## 3) RECODING Stimuli 
+## 3) RECODING Stimuli — only used to reconstruct Movement
 ############################################################
 dataMT$Stimuli <- NA
 dataMT$Stimuli[dataMT$image %in% PA_set]    <- "PA"
@@ -54,7 +56,7 @@ dataMT$Stimuli[dataMT$image %in% neutral_c] <- "stimuli_carre"
 dataMT$Stimuli <- factor(dataMT$Stimuli)
 
 ############################################################
-## 4) RECODING Movement factor (Approach or Avoid) - mapping Cheval (compat/incomp)
+## 4) RECODING Movement (Approach/Avoid) — Cheval mapping (compat/incomp)
 ############################################################
 dataMT$groups <- interaction(factor(dataMT$Stimuli),
                              factor(dataMT$Procedure.Trial.))
@@ -83,16 +85,16 @@ dataMT$Movement <- factor(dataMT$Movement, levels=c("Approach","Avoid"))
 
 ############################################################
 ## 5) VARIABLES + CLEANING
-## - TrailProc : main trials removing training trials
-## - ACC==1 : correct
-## - RT window: 150–3000ms
+## - TrailProc: main trials
+## - ACC==1: correct responses only
+## - RT window: 150–1500
 ############################################################
 dataMT$subject  <- factor(dataMT$Subject)
 dataMT$RT       <- as.numeric(as.character(dataMT$Slide4.RT))
 dataMT$ACC      <- as.numeric(as.character(dataMT$Slide4.ACC))
 dataMT$Training <- as.character(dataMT$Procedure.SubTrial.)
 
-limit_RT <- c(150, 3000)
+limit_RT <- c(150, 1500)
 
 data_main <- data.frame(
   subject  = dataMT$subject,
@@ -113,7 +115,7 @@ data_main <- data.frame(
   droplevels()
 
 ############################################################
-## 6) item_id CORRECTED (neutral vs target) + r/c AS SEPARATE ITEMS
+## 6) CORRECTED item_id (neutral vs target) + treat r/c as distinct items
 ##
 ## - neutral: NEU_<filename_without_extension>
 ## - targets: TGT_<filename_without_extension>
@@ -131,7 +133,7 @@ data_main$item_id <- ifelse(
 data_main$item_id <- factor(data_main$item_id)
 
 ############################################################
-## 7) BUILDING DATASETS FOR THE 2 MODELS
+## 7) DATASETS FOR THE TWO MODELS
 ############################################################
 dat_sed <- data_main %>%
   filter(image %in% c(SB_set, neutral_all)) %>%
@@ -156,7 +158,7 @@ dat_pa <- data_main %>%
   droplevels()
 
 ############################################################
-## 7bis) CODING DEVIATION EFFECT -0.5 / +0.5 
+## 7bis) -0.5 / +0.5 CODING 
 ############################################################
 set_coding_pm05 <- function(df, stim_levels){
   df$Movement     <- factor(as.character(df$Movement), levels=c("Approach","Avoid"))
@@ -172,15 +174,6 @@ set_coding_pm05 <- function(df, stim_levels){
 
 dat_sed <- set_coding_pm05(dat_sed, c("NEU","SED"))
 dat_pa  <- set_coding_pm05(dat_pa,  c("NEU","PA"))
-
-contrasts(dat_sed$Movement)
-contrasts(dat_pa$Movement)
-
-############################################################
-## NOTE (coding -0.5/+0.5)
-## The coefficient Movement:StimulusType is therefore equivalent to :
-##   (Avoid-Approach)_Stim - (Avoid-Approach)_NEU  in ms
-############################################################
 
 ############################################################
 ## 8) SANITY CHECKS 
@@ -200,13 +193,13 @@ stopifnot(length(unique(dat_pa$item))  == 25)
 
 #######################################################################
 #######################################################################
-## PART 1 — LMM ON PILOT DATA (estimates + variance components)
-## + residual diagnostics (justify raw RT)
+## PART 1 — PILOT LMMs (estimates + variance components)
+## + residual diagnostics (to justify using raw RTs)
 #######################################################################
 #######################################################################
 
 ############################################################
-## 1A) MODELS ON THE PILOT DATA (the most complex without singular fits)
+## 1A) Pilot models
 ############################################################
 m_sed_main <- lmer(
   RT ~ Movement * StimulusType + (1 + Movement | subject) + (1|item),
@@ -231,9 +224,9 @@ cat("\nSingular fit (PA main)? ", isSingular(m_pa_main, tol=1e-5), "\n")
 cat("\nVarCorr (PA main):\n"); print(VarCorr(m_pa_main))
 
 ############################################################
-## 1B) Residual diagnostics
-## Objective: document that the Gaussian model on raw RT is acceptable
-## (QQ-plot + residuals vs. adjusted values)
+## 1B) Residual diagnostics (raw RTs)
+## Goal: document that a Gaussian model on raw RTs is acceptable
+## (QQ-plot + residuals vs fitted)
 ############################################################
 diagnose_residuals <- function(m, label){
   op <- par(no.readonly = TRUE)
@@ -243,12 +236,12 @@ diagnose_residuals <- function(m, label){
   qqnorm(resid(m), main = paste0("QQ-plot résidus — ", label))
   qqline(resid(m))
   
-  # 2) Residual vs fitted
+  # 2) Residuals vs fitted
   plot(
     fitted(m), resid(m),
-    xlab = "Adjusted values (fitted)",
-    ylab = "Residuals",
-    main = paste0("Residuals vs fitted — ", label)
+    xlab = "Valeurs ajustées (fitted)",
+    ylab = "Résidus",
+    main = paste0("Résidus vs fitted — ", label)
   )
   abline(h = 0, lty = 2)
   
@@ -258,50 +251,54 @@ diagnose_residuals <- function(m, label){
 diagnose_residuals(m_sed_main, "SED vs NEU (pilot)")
 diagnose_residuals(m_pa_main,  "PA vs NEU (pilot)")
 
+############################################################
+## NOTE (-0.5/+0.5 coding)
+## The Movement:StimulusType coefficient equals:
+##   (Avoid - Approach)_Stim - (Avoid - Approach)_NEU in milliseconds
+############################################################
+
 #######################################################################
 #######################################################################
-## PART 2 — POWER SIMR (for N = 90) 
+## PART 2 — SIMR POWER (N=90) + BALANCED DESIGN
+## + Satterthwaite t-test 
 #######################################################################
 #######################################################################
 
 ############################################################
-## 2A) Balanced design in accordance with our protocol
+## 2A) Balanced design consistent with the protocol
 ##
-## Item × Movement balancing (
+## balance item × Movement (stratified)
 ## - NEU: 96 trials (48 Approach / 48 Avoid)
-## - Stimulus: 48 trials (24 Approach / 24 Avoid)
-## Total = 144 trials/subject
+## - Stim: 48 trials (24 Approach / 24 Avoid)
+## Total = 144 trials / subject
 ##
-## Check: nrow(df) == 144*N
+## check: nrow(df) == 144*N
 ############################################################
 make_design_balanced <- function(N, stim_label){
   
-  neu_levels <- paste0("NEU_", 1:20)  # 20 neutral (r/c separated)
-  tgt_levels <- paste0("TGT_", 1:5)   # 5 target per category
+  neu_levels <- paste0("NEU_", 1:20)  
+  tgt_levels <- paste0("TGT_", 1:5)   
   
   rows <- vector("list", N)
   
   for(i in seq_len(N)){
     
-    # NEU: 48 trials per Movement 
     neu_app <- sample(rep(neu_levels, length.out = 48))
     neu_avo <- sample(rep(neu_levels, length.out = 48))
     
     neu <- rbind(
-      data.frame(subject=i, Movement="Approach", StimulusType="NEU",       item=neu_app),
-      data.frame(subject=i, Movement="Avoid",    StimulusType="NEU",       item=neu_avo)
+      data.frame(subject=i, Movement="Approach", StimulusType="NEU",      item=neu_app),
+      data.frame(subject=i, Movement="Avoid",    StimulusType="NEU",      item=neu_avo)
     )
     
-    # TGT: 24 trials per Movement  
     tgt_app <- sample(rep(tgt_levels, length.out = 24))
     tgt_avo <- sample(rep(tgt_levels, length.out = 24))
     
     stim <- rbind(
-      data.frame(subject=i, Movement="Approach", StimulusType=stim_label,  item=tgt_app),
-      data.frame(subject=i, Movement="Avoid",    StimulusType=stim_label,  item=tgt_avo)
+      data.frame(subject=i, Movement="Approach", StimulusType=stim_label, item=tgt_app),
+      data.frame(subject=i, Movement="Avoid",    StimulusType=stim_label, item=tgt_avo)
     )
     
-    # randomize trial order
     df_i <- rbind(neu, stim)
     df_i <- df_i[sample.int(nrow(df_i)), ]
     rows[[i]] <- df_i
@@ -314,20 +311,30 @@ make_design_balanced <- function(N, stim_label){
   df$StimulusType <- factor(df$StimulusType, levels=c("NEU", stim_label))
   df$item <- factor(df$item)
   
-  # same coding -0.5/+0.5 as in the pilot models
   contrasts(df$Movement)     <- matrix(c(-0.5, 0.5), ncol=1)
   contrasts(df$StimulusType) <- matrix(c(-0.5, 0.5), ncol=1)
   
-  # Expected check: 144 trials/subject
   stopifnot(nrow(df) == 144 * N)
   
   df
 }
 
 ############################################################
-## 2B) RUN POWER SIMR (N fixe)
+## Robust helper: identify the interaction term name in fixef()
+############################################################
+get_interaction_term <- function(m){
+  term <- grep("Movement.*StimulusType", names(fixef(m)), value=TRUE)
+  if(length(term) != 1){
+    stop("Interaction term not uniquely identified. Found: ", paste(term, collapse=", "))
+  }
+  term
+}
+
+############################################################
+## 2B) RUN SIMR POWER (fixed N)
 ## - nsim = 1000 
-## - seed fixed before each simulation (reproducible)
+## - set seed before each simulation (reproducible)
+## - Satterthwaite t-test (method='t') for LMM via lmerTest
 ############################################################
 run_power_simr <- function(m_pilot, stim_label, N = 90, nsim = 1000, seed = 123){
   
@@ -343,19 +350,18 @@ run_power_simr <- function(m_pilot, stim_label, N = 90, nsim = 1000, seed = 123)
     data = design_df
   )
   
-  term <- grep("Movement.*StimulusType", names(fixef(m_sim)), value=TRUE)
-  stopifnot(length(term) == 1)
+  term <- get_interaction_term(m_sim)
   
   powerSim(
     m_sim,
-    test = fixed(term, method="z"),
+    test = fixed(term, method="t"),  # Satterthwaite via lmerTest
     nsim = nsim,
     fitOpts = list(control = lmerControl(optimizer="bobyqa"))
   )
 }
 
 ############################################################
-## 2C) POWER à N=90 — nsim = 1000
+## 2C) POWER at N=90 — nsim=1000
 ############################################################
 power90_sed <- run_power_simr(m_sed_main, "SED", N = 90, nsim = 1000, seed = 1001)
 power90_pa  <- run_power_simr(m_pa_main,  "PA",  N = 90, nsim = 1000, seed = 1002)
@@ -365,19 +371,20 @@ power90_pa
 
 #######################################################################
 #######################################################################
-## PART 3 — POWER CURVE (SIMR) — nsim = 1000 + seed fixed
+## PARTIE 3 — POWER CURVE (SIMR) — nsim=1000 + seed fixed
 #######################################################################
 #######################################################################
 
 ############################################################
-## General parameters (demande : nsim = 1000)
+## General parameters
 ############################################################
 nsim_curve  <- 1000
-N_seq       <- seq(40, 120, by = 10)
+N_seq       <- seq(20, 60, by = 5)
 
 ############################################################
 ## Function: power curve for a given model
-# on simulated model (makeLmer) based on balanced design
+##  based on a simulated model (makeLmer) using a balanced design
+##  Satterthwaite t-test
 ############################################################
 run_power_curve <- function(m_pilot, stim_label, N_seq, nsim = 1000, seed = 2001){
   
@@ -387,10 +394,8 @@ run_power_curve <- function(m_pilot, stim_label, N_seq, nsim = 1000, seed = 2001
   cat("POWER CURVE —", stim_label, "vs NEU\n")
   cat("=============================\n")
   
-  # Design équilibré au N max
   design_df <- make_design_balanced(max(N_seq), stim_label)
   
-  # Modèle simulé calé sur le pilote
   m_sim <- makeLmer(
     formula(m_pilot),
     fixef(m_pilot),
@@ -399,15 +404,13 @@ run_power_curve <- function(m_pilot, stim_label, N_seq, nsim = 1000, seed = 2001
     data = design_df
   )
   
-  term <- grep("Movement.*StimulusType", names(fixef(m_sim)), value = TRUE)
-  stopifnot(length(term) == 1)
+  term <- get_interaction_term(m_sim)
   
-  # Étendre si besoin (robustesse)
   m_ext <- extend(m_sim, along = "subject", n = max(N_seq))
   
   pc <- powerCurve(
     m_ext,
-    test = fixed(term, method = "z"),
+    test = fixed(term, method = "t"),   
     along = "subject",
     breaks = N_seq,
     nsim = nsim,
@@ -421,30 +424,32 @@ run_power_curve <- function(m_pilot, stim_label, N_seq, nsim = 1000, seed = 2001
 }
 
 ############################################################
-## Launch the curves (separate seeds)
+## Run the curves (distinct seeds)
 ############################################################
 pc_sed <- run_power_curve(m_sed_main, "SED", N_seq = N_seq, nsim = nsim_curve, seed = 3001)
 pc_pa  <- run_power_curve(m_pa_main,  "PA",  N_seq = N_seq, nsim = nsim_curve, seed = 3002)
 
 #######################################################################
 #######################################################################
-## PART 4 — N required for 90% power + FIGURES (power curves)
+## PART 4 — Required N for 90% + FIGURES (power curves)
 #######################################################################
 #######################################################################
 
 ############################################################
-## 1) Extract N for a target power
+## 1) Extract the interval [N_lo, N_hi] that brackets 90% (from the power curve)
+##    then re-simulate with step = 1 within that interval
 ############################################################
-get_N_for_power <- function(power_curve_obj, target_power = 0.90){
+refine_N_by_resimulation <- function(power_curve_obj, m_pilot, stim_label,
+                                     target_power = 0.90,
+                                     nsim_refine = 1000,
+                                     seed_base = 9000){
   
   tab <- as.data.frame(summary(power_curve_obj))
   
-  # colonne N: parfois "subjects", parfois "nlevels"
   if(!("subjects" %in% names(tab)) && ("nlevels" %in% names(tab))){
     tab$subjects <- tab$nlevels
   }
   
-  # colonne power: parfois "power", parfois "mean"
   if(!("power" %in% names(tab)) && ("mean" %in% names(tab))){
     tab$power <- tab$mean
   }
@@ -453,41 +458,100 @@ get_N_for_power <- function(power_curve_obj, target_power = 0.90){
   
   tab <- tab[order(tab$subjects), ]
   
-  idx <- which(tab$power >= target_power)[1]
-  
-  if(is.na(idx)){
+  if(max(tab$power, na.rm=TRUE) < target_power){
     cat("\n⚠️  Target power not achieved in the tested range.\n")
-    return(list(N = NA, tab = tab))
+    return(list(N_exact = NA, tab = tab, refine_tab = NULL,
+                N_lo = NA, N_hi = NA))
   }
   
-  N_needed <- tab$subjects[idx]
-  cat("\n✅ Minimum N for", target_power*100, "% power =", N_needed, "subjects\n")
+  idx_hi <- which(tab$power >= target_power)[1]
+  idx_lo <- idx_hi - 1
   
-  list(N = N_needed, tab = tab)
+  if(tab$power[idx_hi] == target_power){
+    N_exact <- tab$subjects[idx_hi]
+    cat("\n✅ N exact = ", N_exact, " n", sep="")
+    return(list(N_exact = N_exact, tab = tab, refine_tab = NULL,
+                N_lo = N_exact, N_hi = N_exact))
+  }
+  
+  N_lo <- tab$subjects[idx_lo]; p_lo <- tab$power[idx_lo]
+  N_hi <- tab$subjects[idx_hi]; p_hi <- tab$power[idx_hi]
+  
+  cat("\nDetected framing (power curve) :\n")
+  cat("  N =", N_lo, " → power_mean =", round(p_lo,4), "\n")
+  cat("  N =", N_hi, " → power_mean =", round(p_hi,4), "\n")
+  cat("\n🔁 SIMR RE-SIMULATION in steps of 1 between ", N_lo, " and ", N_hi, "...\n", sep="")
+  
+  extract_power_from_powersim <- function(ps_obj){
+    s <- summary(ps_obj)
+    p  <- if("power" %in% names(s)) as.numeric(s[["power"]]) else
+      if("mean"  %in% names(s)) as.numeric(s[["mean"]])  else NA_real_
+    lo <- if("lower" %in% names(s)) as.numeric(s[["lower"]]) else NA_real_
+    hi <- if("upper" %in% names(s)) as.numeric(s[["upper"]]) else NA_real_
+    list(power = p, lower = lo, upper = hi)
+  }
+  
+  N_grid <- seq(N_lo, N_hi, by = 1)
+  refine_rows <- vector("list", length(N_grid))
+  
+  for(i in seq_along(N_grid)){
+    N_i <- N_grid[i]
+    seed_i <- seed_base + N_i
+    
+    ps <- run_power_simr(m_pilot, stim_label, N = N_i, nsim = nsim_refine, seed = seed_i)
+    ex <- extract_power_from_powersim(ps)
+    
+    refine_rows[[i]] <- data.frame(
+      subjects = N_i,
+      power = ex$power,
+      lower = ex$lower,
+      upper = ex$upper
+    )
+    
+    cat("  N=", N_i, " → power_mean=", round(ex$power,4),
+        " [", round(ex$lower,4), ", ", round(ex$upper,4), "]\n", sep="")
+  }
+  
+  refine_tab <- bind_rows(refine_rows)
+  
+  idx <- which(refine_tab$power >= target_power)[1]
+  if(is.na(idx)){
+    cat("\n⚠️  Even after refinement, the target is not achieved.\n")
+    N_exact <- NA
+  } else {
+    N_exact <- refine_tab$subjects[idx]
+    cat("\n✅ N exact (re-simulated) for power_mean  ", target_power*100, "% = ", N_exact, "\n", sep="")
+  }
+  
+  list(N_exact = N_exact, tab = tab, refine_tab = refine_tab,
+       N_lo = N_lo, N_hi = N_hi)
 }
 
 ############################################################
-## 2) Figure: power curve + IC + threshold (90% default) + target N
+## 2) Figure: curve in step of 5 + CI + threshold (90%) + exact re-simulated N
 ############################################################
-plot_power_curve <- function(tab, N_target, stim_label, target_power = 0.90){
+plot_power_curve_step5_with_Nexact <- function(tab, N_exact, stim_label, target_power = 0.90){
   
-  # column N: sometimes “subjects,” sometimes “nlevels”
   if(!("subjects" %in% names(tab)) && ("nlevels" %in% names(tab))){
     tab$subjects <- tab$nlevels
   }
-  
-  # power column: sometimes “power,” sometimes “mean”
   if(!("power" %in% names(tab)) && ("mean" %in% names(tab))){
     tab$power <- tab$mean
   }
-  
   stopifnot("subjects" %in% names(tab), "power" %in% names(tab))
   
   tab <- tab[order(tab$subjects), ]
   
+  N_min <- min(tab$subjects)
+  N_max <- max(tab$subjects)
+  N_seq5 <- seq(N_min, N_max, by = 5)
+  
+  tab5 <- tab[tab$subjects %in% N_seq5, , drop=FALSE]
+  if(nrow(tab5) < 2) tab5 <- tab
+  
   plot(
-    x = tab$subjects,
-    y = tab$power,
+    x = tab5$subjects,
+    y = tab5$power,
     type = "b", pch = 19,
     xlab = "Number of participants (N)",
     ylab = "Power",
@@ -495,71 +559,91 @@ plot_power_curve <- function(tab, N_target, stim_label, target_power = 0.90){
     main = paste0("Power curve — ", stim_label, " vs NEU (interaction effect)")
   )
   
-  # IC 95%
-  lines(tab$subjects, tab$lower, lty = 2)
-  lines(tab$subjects, tab$upper, lty = 2)
+  if(all(c("lower","upper") %in% names(tab5))){
+    lines(tab5$subjects, tab5$lower, lty = 2)
+    lines(tab5$subjects, tab5$upper, lty = 2)
+  }
   
-  # threshold (90% default)
   abline(h = target_power, lty = 3)
   
-  # Required N
-  if(!is.na(N_target)){
-    abline(v = N_target, lty = 3)
+  if(!is.na(N_exact)){
+    abline(v = N_exact, lty = 3)
+    points(N_exact, target_power, pch = 19)
+    
+    segments(x0 = N_exact, y0 = 0, x1 = N_exact, y1 = target_power, lty = 3)
+    segments(x0 = par("usr")[1], y0 = target_power, x1 = N_exact, y1 = target_power, lty = 3)
+    
     text(
-      x = N_target,
+      x = N_exact,
       y = target_power,
-      labels = paste0("N", target_power*100, " = ", N_target),
+      labels = paste0("N = ", N_exact),
       pos = 4
     )
   }
   
   legend(
     "bottomright",
-    legend = c("Power", "IC 95% (lower/upper)", paste0("Threshold ", target_power*100, "%")),
-    lty = c(1, 2, 3),
-    pch = c(19, NA, NA),
+    legend = c("Power (step 5)", "IC 95% (lower/upper)", paste0("Seuil ", target_power*100, "%"), "N exact"),
+    lty = c(1, 2, 3, 3),
+    pch = c(19, NA, NA, 19),
     bty = "n"
   )
 }
 
 ############################################################
-## 3) Calculation for N = 90 + summary
+## 3) Compute exact N (local re-simulation) + summary
 ############################################################
 cat("\n=============================\nSED vs NEU\n=============================\n")
-res_sed <- get_N_for_power(pc_sed, target_power = 0.90)
+res_sed <- refine_N_by_resimulation(
+  power_curve_obj = pc_sed,
+  m_pilot = m_sed_main,
+  stim_label = "SED",
+  target_power = 0.90,
+  nsim_refine = 1000,
+  seed_base = 91000
+)
 
 cat("\n=============================\nPA vs NEU\n=============================\n")
-res_pa  <- get_N_for_power(pc_pa,  target_power = 0.90)
+res_pa <- refine_N_by_resimulation(
+  power_curve_obj = pc_pa,
+  m_pilot = m_pa_main,
+  stim_label = "PA",
+  target_power = 0.90,
+  nsim_refine = 1000,
+  seed_base = 92000
+)
 
 cat("\n=============================\nFINAL SUMMARY\n=============================\n")
-cat("SED  N =", res_sed$N, "\n")
-cat("PA   N =", res_pa$N,  "\n")
+cat("SED  N90 =", res_sed$N_exact, "\n")
+cat("PA   N90 =", res_pa$N_exact,  "\n")
 
 ############################################################
-## 4) Figures  
+## 4) Figures (one per model) — DISPLAY STEP OF 5 + exact N
 ############################################################
 par(mfrow = c(1, 2))
-plot_power_curve(res_sed$tab, res_sed$N, stim_label = "SED", target_power = 0.90)
-plot_power_curve(res_pa$tab,  res_pa$N,  stim_label = "PA",  target_power = 0.90)
+plot_power_curve_step5_with_Nexact(res_sed$tab, res_sed$N_exact, stim_label = "SED", target_power = 0.90)
+plot_power_curve_step5_with_Nexact(res_pa$tab,  res_pa$N_exact,  stim_label = "PA",  target_power = 0.90)
 par(mfrow = c(1, 1))
 
 #### Figure caption ####
-# Power curves for the Movement × StimulusType interaction estimated by 
-# Monte-Carlo simulation (simr). Points represent the mean estimated statistical 
-# power at each sample size (N), computed across 1000 simulated datasets. Solid 
-# lines show the estimated power trajectory, and dashed lines indicate the 95% 
+# Power curves for the Movement × StimulusType interaction estimated by
+# Monte-Carlo simulation (simr). Points represent the mean estimated statistical
+# power at each sample size (N), computed across 1000 simulated datasets. Solid
+# lines show the estimated power trajectory, and dashed lines indicate the 95%
 # Monte-Carlo confidence intervals around these estimates. The horizontal dotted
-# line marks the target power (90%), and the vertical dotted line indicates the 
-# smallest sample size at which the lower bound of the confidence interval reaches 
-# this threshold. Sample size selection was based on this lower bound to ensure 
-# conservative and robust power despite simulation uncertainty.
+# line marks the target power (90%). To obtain an exact N at the integer level,
+# we re-ran simr power simulations (nsim = 1000) for each N in steps of 1 between
+# the two adjacent curve points that bracket the 90% threshold, and selected the
+# smallest N for which mean power reached or exceeded 90%. The vertical dotted line
+# indicates this re-simulated N, and the segments project the intersection onto
+# the x- and y-axes for readability.
 
 ############################################################
-## Export in PDF 
+## Export to PDF
 ############################################################
-pdf("YOUR_PATH.pdf", width = 10, height = 4) # UPDATE YOUR PATH HERE
+pdf("C:/Users/franc/OneDrive - University of Ottawa/Doctorat Ottawa/3 - Article editing/AAT validation study/Registered report/power_curves_N90.pdf", width = 10, height = 4)
 par(mfrow = c(1, 2))
-plot_power_curve(res_sed$tab, res_sed$N, stim_label = "SED", target_power = 0.90)
-plot_power_curve(res_pa$tab,  res_pa$N,  stim_label = "PA",  target_power = 0.90)
+plot_power_curve_step5_with_Nexact(res_sed$tab, res_sed$N_exact, stim_label = "SED", target_power = 0.90)
+plot_power_curve_step5_with_Nexact(res_pa$tab,  res_pa$N_exact,  stim_label = "PA",  target_power = 0.90)
 par(mfrow = c(1, 1))
 dev.off()
