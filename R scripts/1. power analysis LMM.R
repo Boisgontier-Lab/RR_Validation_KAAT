@@ -19,7 +19,7 @@ invisible(lapply(packages, library, character.only = TRUE))
 # Ensure simr uses Satterthwaite df via lmerTest for method="t"
 simr::simrOptions(lmerTestDdf = "Satterthwaite")
 
-path_dir <- "C:/Users/franc/OneDrive - University of Ottawa/Doctorat Ottawa/3 - Article editing/AAT validation study/Registered report/2018_Cheval_code and data"
+path_dir <- # INSERT YOUR PATH HERE
 raw_file <- file.path(path_dir, "raw_data_eprime_zen.csv")
 
 ############################################################
@@ -641,7 +641,7 @@ par(mfrow = c(1, 1))
 ############################################################
 ## Export to PDF
 ############################################################
-pdf("C:/Users/franc/OneDrive - University of Ottawa/Doctorat Ottawa/3 - Article editing/AAT validation study/Registered report/power_curves_N90.pdf", width = 10, height = 4)
+pdf(paste0(path_dir, "/power curves.pdf"), width = 10, height = 4)
 par(mfrow = c(1, 2))
 plot_power_curve_step5_with_Nexact(res_sed$tab, res_sed$N_exact, stim_label = "SED", target_power = 0.90)
 plot_power_curve_step5_with_Nexact(res_pa$tab,  res_pa$N_exact,  stim_label = "PA",  target_power = 0.90)
