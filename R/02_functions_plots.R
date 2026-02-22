@@ -37,36 +37,36 @@ diagnose_residuals <- function(m, label){
 #' including 95% confidence intervals if available. It highlights the target power threshold
 #' and annotates the exact sample size required to reach the desired power.
 #'
-#' @param tab Data frame. Summary table with sample sizes and power estimates.
-#' @param N_exact Integer or NA. Exact sample size required for target power (if available).
+#' @param power_summary Data frame. Summary table with sample sizes and power estimates.
+#' @param n_exact Integer or NA. Exact sample size required for target power (if available).
 #' @param stim_label Character. Label for the target stimulus type (e.g., "PA" or "SED").
 #' @param target_power Numeric. Desired power threshold (default: 0.90).
 #' @return None. The function produces a plot.
 #' @examples
-#' plot_power_curve_step5_with_Nexact(tab, N_exact, "SED", target_power = 0.90)
+#' plot_power_curve_step5_with_Nexact(power_summary, n_exact, "SED", target_power = 0.90)
 plot_power_curve_step5_with_Nexact <- function(
-    tab,
-    N_exact,
+    power_summary,
+    n_exact,
     stim_label,
     target_power = 0.90
 ){
   
-  if(!("subjects" %in% names(tab)) && ("nlevels" %in% names(tab))){
-    tab$subjects <- tab$nlevels
+  if(!("subjects" %in% names(power_summary)) && ("nlevels" %in% names(power_summary))){
+    power_summary$subjects <- power_summary$nlevels
   }
-  if(!("power" %in% names(tab)) && ("mean" %in% names(tab))){
-    tab$power <- tab$mean
+  if(!("power" %in% names(power_summary)) && ("mean" %in% names(power_summary))){
+    power_summary$power <- power_summary$mean
   }
-  stopifnot("subjects" %in% names(tab), "power" %in% names(tab))
+  stopifnot("subjects" %in% names(power_summary), "power" %in% names(power_summary))
   
-  tab <- tab[order(tab$subjects), ]
+  power_summary <- power_summary[order(power_summary$subjects), ]
   
-  N_min <- min(tab$subjects)
-  N_max <- max(tab$subjects)
+  N_min <- min(power_summary$subjects)
+  N_max <- max(power_summary$subjects)
   N_seq5 <- seq(N_min, N_max, by = 5)
   
-  tab5 <- tab[tab$subjects %in% N_seq5, , drop=FALSE]
-  if(nrow(tab5) < 2) tab5 <- tab
+  tab5 <- power_summary[power_summary$subjects %in% N_seq5, , drop=FALSE]
+  if(nrow(tab5) < 2) tab5 <- power_summary
   
   plot(
     x = tab5$subjects,
@@ -85,29 +85,29 @@ plot_power_curve_step5_with_Nexact <- function(
   
   abline(h = target_power, lty = 3)
   
-  if(!is.na(N_exact)){
-    abline(v = N_exact, lty = 3)
-    points(N_exact, target_power, pch = 19)
+  if(!is.na(n_exact)){
+    abline(v = n_exact, lty = 3)
+    points(n_exact, target_power, pch = 19)
     
     segments(
-        x0 = N_exact,
+        x0 = n_exact,
         y0 = 0,
-        x1 = N_exact,
+        x1 = n_exact,
         y1 = target_power,
         lty = 3
     )
     segments(
         x0 = par("usr")[1],
         y0 = target_power,
-        x1 = N_exact,
+        x1 = n_exact,
         y1 = target_power,
         lty = 3
     )
     
     text(
-      x = N_exact,
+      x = n_exact,
       y = target_power,
-      labels = paste0("N = ", N_exact),
+      labels = paste0("N = ", n_exact),
       pos = 4
     )
   }

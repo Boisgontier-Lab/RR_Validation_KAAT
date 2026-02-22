@@ -25,7 +25,7 @@ invisible(lapply(packages, library, character.only = TRUE))
 # Ensure simr uses Satterthwaite df via lmerTest for method="t"
 simr::simrOptions(lmerTestDdf = "Satterthwaite")
 
-path_dir <- # INSERT YOUR PATH HERE
+path_dir <- file.path("/Users/timotheedumas/Documents/University/UOttawa/Recherche/RR_Validation_KAAT/2018_cheval_code_and_data")
 raw_file <- file.path(path_dir, "raw_data_eprime_zen.csv")
 
 ############################################################
@@ -180,7 +180,7 @@ diagnose_residuals(m_pa_main,  "PA vs NEU (pilot)")
 ## check: nrow(df) == 144*N
 ############################################################
 
-## Check function make_design_balanced(N, stim_label) in 01_functions_analysis.R
+## Check function make_design_balanced(n_subjects, stim_label) in 01_functions_analysis.R
 ## Check function get_interaction_term(m) in 01_functions_analysis.R
 
 ############################################################
@@ -190,14 +190,14 @@ diagnose_residuals(m_pa_main,  "PA vs NEU (pilot)")
 ## - Satterthwaite t-test (method='t') for LMM via lmerTest
 ############################################################
 
-## Check function run_power_simr(m, stim_label, N, nsim, seed) in 01_functions_analysis.R
+## Check function run_power_simr(pilot_model, stim_label, n_subjects, n_simulations, seed) in 01_functions_analysis.R
 
 ############################################################
 ## 2C) POWER at N=90 — nsim=1000
 ############################################################
 
-power90_sed <- run_power_simr(m_sed_main, "SED", N = 90, nsim = 1000, seed = 1001)
-power90_pa  <- run_power_simr(m_pa_main,  "PA",  N = 90, nsim = 1000, seed = 1002)
+power90_sed <- run_power_simr(m_sed_main, "SED", n_subjects = 90, n_simulations = 1000, seed = 1001)
+power90_pa  <- run_power_simr(m_pa_main,  "PA",  n_subjects = 90, n_simulations = 1000, seed = 1002)
 
 power90_sed
 power90_pa
@@ -216,8 +216,8 @@ power90_pa
 ## General parameters
 ############################################################
 
-nsim_curve  <- 1000
-N_seq       <- seq(20, 60, by = 5)
+n_simulations_curve  <- 1000
+sample_sizes         <- seq(20, 60, by = 5)
 
 ############################################################
 ## Run the curves (distinct seeds)
@@ -226,15 +226,15 @@ N_seq       <- seq(20, 60, by = 5)
 pc_sed <- run_power_curve(
     m_sed_main,
     "SED",
-    N_seq = N_seq,
-    nsim = nsim_curve,
+    sample_sizes = sample_sizes,
+    n_simulations = n_simulations_curve,
     seed = 3001
 )
 pc_pa  <- run_power_curve(
     m_pa_main,
     "PA",
-    N_seq = N_seq,
-    nsim = nsim_curve,
+    sample_sizes = sample_sizes,
+    n_simulations = n_simulations_curve,
     seed = 3002
 )
 
@@ -249,17 +249,17 @@ pc_pa  <- run_power_curve(
 #######################################################################
 
 ############################################################
-## 1) Extract the interval [N_lo, N_hi] that brackets 90% (from the power curve)
+## 1) Extract the interval [n_lower, n_upper] that brackets 90% (from the power curve)
 ##    then re-simulate with step = 1 within that interval
 ############################################################
 
-## Check function refine_N_by_resimulation(power_curve_obj, m_pilot, stim_label, target_power, nsim_refine, seed_base) in 01_functions_analysis.R
+## Check function refine_N_by_resimulation(power_curve_obj, pilot_model, stim_label, target_power, n_simulations_refine, base_seed) in 01_functions_analysis.R
 
 ############################################################
 ## 2) Figure: curve in step of 5 + CI + threshold (90%) + exact re-simulated N
 ############################################################
 
-## Check function plot_power_curve_step5_with_Nexact(tab, N_exact, stim_label, target_power) in 02_functions_plots.R
+## Check function plot_power_curve_step5_with_Nexact(power_summary, n_exact, stim_label, target_power) in 02_functions_plots.R
 
 ############################################################
 ## 3) Compute exact N (local re-simulation) + summary
@@ -268,26 +268,26 @@ pc_pa  <- run_power_curve(
 cat("\n=============================\nSED vs NEU\n=============================\n")
 res_sed <- refine_N_by_resimulation(
   power_curve_obj = pc_sed,
-  m_pilot = m_sed_main,
+  pilot_model = m_sed_main,
   stim_label = "SED",
   target_power = 0.90,
-  nsim_refine = 1000,
-  seed_base = 91000
+  n_simulations_refine = 1000,
+  base_seed = 91000
 )
 
 cat("\n=============================\nPA vs NEU\n=============================\n")
 res_pa <- refine_N_by_resimulation(
   power_curve_obj = pc_pa,
-  m_pilot = m_pa_main,
+  pilot_model = m_pa_main,
   stim_label = "PA",
   target_power = 0.90,
-  nsim_refine = 1000,
-  seed_base = 92000
+  n_simulations_refine = 1000,
+  base_seed = 92000
 )
 
 cat("\n=============================\nFINAL SUMMARY\n=============================\n")
-cat("SED  N90 =", res_sed$N_exact, "\n")
-cat("PA   N90 =", res_pa$N_exact,  "\n")
+cat("SED  N90 =", res_sed$n_exact, "\n")
+cat("PA   N90 =", res_pa$n_exact,  "\n")
 
 ############################################################
 ## 4) Figures (one per model) — DISPLAY STEP OF 5 + exact N
@@ -295,14 +295,14 @@ cat("PA   N90 =", res_pa$N_exact,  "\n")
 
 par(mfrow = c(1, 2))
 plot_power_curve_step5_with_Nexact(
-    res_sed$tab,
-    res_sed$N_exact,
+    res_sed$power_summary,
+    res_sed$n_exact,
     stim_label = "SED",
     target_power = 0.90)
 
 plot_power_curve_step5_with_Nexact(
-    res_pa$tab,
-    res_pa$N_exact,
+    res_pa$power_summary,
+    res_pa$n_exact,
     stim_label = "PA",
     target_power = 0.90)
 par(mfrow = c(1, 1))
@@ -327,14 +327,14 @@ par(mfrow = c(1, 1))
 pdf(paste0(path_dir, "/power curves.pdf"), width = 10, height = 4)
 par(mfrow = c(1, 2))
 plot_power_curve_step5_with_Nexact(
-    res_sed$tab,
-    res_sed$N_exact,
+    res_sed$power_summary,
+    res_sed$n_exact,
     stim_label = "SED",
     target_power = 0.90
 )
 plot_power_curve_step5_with_Nexact(
-    res_pa$tab,
-    res_pa$N_exact,
+    res_pa$power_summary,
+    res_pa$n_exact,
     stim_label = "PA",
     target_power = 0.90
 )

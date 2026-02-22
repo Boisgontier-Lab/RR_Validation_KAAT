@@ -7,76 +7,76 @@
 #'   - 48 target trials (24 Approach, 24 Avoid) distributed across 5 target items
 #' The items are randomly sampled for each condition and subject.
 #' All variables are coded as factors, with -0.5/+0.5 contrasts for Movement and StimulusType.
-#' The function checks that the total number of rows is 144 * N.
+#' The function checks that the total number of rows is 144 * n_subjects.
 #'
-#' @param N Integer. Number of subjects to simulate.
+#' @param n_subjects Integer. Number of subjects to simulate.
 #' @param stim_label Character. Label for the target stimulus type (e.g., "PA" or "SED").
 #' @return A data frame with the balanced design, ready for power simulation.
 #' @examples
 #' df <- make_design_balanced(90, "SED")
-make_design_balanced <- function(N, stim_label){
+make_design_balanced <- function(n_subjects, stim_label){
   
-  neu_levels <- paste0("NEU_", 1:20)
-  tgt_levels <- paste0("TGT_", 1:5)
+  neutral_item_levels <- paste0("NEU_", 1:20)
+  target_item_levels  <- paste0("TGT_", 1:5)
   
-  rows <- vector("list", N)
+  subject_dataframes <- vector("list", n_subjects)
   
-  for(i in seq_len(N)){
+  for(i in seq_len(n_subjects)){
     
-    neu_app <- sample(rep(neu_levels, length.out = 48))
-    neu_avo <- sample(rep(neu_levels, length.out = 48))
+    neutral_approach_items <- sample(rep(neutral_item_levels, length.out = 48))
+    neutral_avoid_items    <- sample(rep(neutral_item_levels, length.out = 48))
     
-    neu <- rbind(
+    neutral_trials <- rbind(
       data.frame(
         subject = i,
         Movement = "Approach",
         StimulusType = "NEU",
-        item = neu_app
+        item = neutral_approach_items
       ),
       data.frame(
         subject = i,
         Movement = "Avoid",
         StimulusType = "NEU",
-        item = neu_avo
+        item = neutral_avoid_items
       )
     )
     
-    tgt_app <- sample(rep(tgt_levels, length.out = 24))
-    tgt_avo <- sample(rep(tgt_levels, length.out = 24))
+    target_approach_items <- sample(rep(target_item_levels, length.out = 24))
+    target_avoid_items    <- sample(rep(target_item_levels, length.out = 24))
     
-    stim <- rbind(
+    target_trials <- rbind(
       data.frame(
         subject = i,
         Movement = "Approach",
         StimulusType = stim_label,
-        item = tgt_app
+        item = target_approach_items
       ),
       data.frame(
         subject = i,
         Movement = "Avoid",
         StimulusType = stim_label,
-        item = tgt_avo
+        item = target_avoid_items
       )
     )
     
-    df_i <- rbind(neu, stim)
-    df_i <- df_i[sample.int(nrow(df_i)), ]
-    rows[[i]] <- df_i
+    subject_trials <- rbind(neutral_trials, target_trials)
+    subject_trials <- subject_trials[sample.int(nrow(subject_trials)), ]
+    subject_dataframes[[i]] <- subject_trials
   }
 
-  df <- bind_rows(rows)
+  design <- bind_rows(subject_dataframes)
 
-  df$subject <- factor(df$subject)
-  df$Movement <- factor(df$Movement, levels=c("Approach","Avoid"))
-  df$StimulusType <- factor(df$StimulusType, levels=c("NEU", stim_label))
-  df$item <- factor(df$item)
+  design$subject      <- factor(design$subject)
+  design$Movement     <- factor(design$Movement, levels=c("Approach","Avoid"))
+  design$StimulusType <- factor(design$StimulusType, levels=c("NEU", stim_label))
+  design$item         <- factor(design$item)
 
-  contrasts(df$Movement)     <- matrix(c(-0.5, 0.5), ncol=1)
-  contrasts(df$StimulusType) <- matrix(c(-0.5, 0.5), ncol=1)
+  contrasts(design$Movement)     <- matrix(c(-0.5, 0.5), ncol=1)
+  contrasts(design$StimulusType) <- matrix(c(-0.5, 0.5), ncol=1)
 
-  stopifnot(nrow(df) == 144 * N)
+  stopifnot(nrow(design) == 144 * n_subjects)
 
-  df
+  design
 }
 
 #' Identify the interaction term name in model fixed effects
@@ -85,16 +85,16 @@ make_design_balanced <- function(N, stim_label){
 #' in the fixed effects of a linear mixed model. It returns the exact term name as used in the model.
 #' If the interaction term is not uniquely identified, the function stops with an error.
 #'
-#' @param m A fitted linear mixed model (e.g., from lmer).
+#' @param model A fitted linear mixed model (e.g., from lmer).
 #' @return Character string. The name of the interaction term in the model.
 #' @examples
-#' term <- get_interaction_term(m)
-get_interaction_term <- function(m){
-  term <- grep("Movement.*StimulusType", names(fixef(m)), value=TRUE)
-  if(length(term) != 1){
-    stop("Interaction term not uniquely identified. Found: ", paste(term, collapse=", "))
+#' interaction_term <- get_interaction_term(model)
+get_interaction_term <- function(model){
+  interaction_term <- grep("Movement.*StimulusType", names(fixef(model)), value=TRUE)
+  if(length(interaction_term) != 1){
+    stop("Interaction term not uniquely identified. Found: ", paste(interaction_term, collapse=", "))
   }
-  term
+  interaction_term
 }
 
 #' Run a power simulation for a linear mixed model using simr
@@ -104,40 +104,40 @@ get_interaction_term <- function(m){
 #' simulates the model, identifies the interaction term, and computes power using
 #' the Satterthwaite t-test (via lmerTest).
 #'
-#' @param m_pilot A fitted pilot linear mixed model (from lmer).
+#' @param pilot_model A fitted pilot linear mixed model (from lmer).
 #' @param stim_label Character. Label for the target stimulus type (e.g., "PA" or "SED").
-#' @param N Integer. Number of subjects to simulate (default: 90).
-#' @param nsim Integer. Number of simulations to run (default: 1000).
+#' @param n_subjects Integer. Number of subjects to simulate (default: 90).
+#' @param n_simulations Integer. Number of simulations to run (default: 1000).
 #' @param seed Integer. Random seed for reproducibility (default: 123).
 #' @return A simr powerSim object containing the power estimate and confidence interval.
 #' @examples
-#' ps <- run_power_simr(m_pilot, "SED", N = 90, nsim = 1000, seed = 123)
+#' power_result <- run_power_simr(pilot_model, "SED", n_subjects = 90, n_simulations = 1000, seed = 123)
 run_power_simr <- function(
-    m_pilot,
+    pilot_model,
     stim_label,
-    N = 90,
-    nsim = 1000,
+    n_subjects = 90,
+    n_simulations = 1000,
     seed = 123
 ){
   
   set.seed(seed)
   
-  design_df <- make_design_balanced(N, stim_label)
+  design_data <- make_design_balanced(n_subjects = n_subjects, stim_label = stim_label)
   
-  m_sim <- makeLmer(
-    formula(m_pilot),
-    fixef(m_pilot),
-    VarCorr(m_pilot),
-    sigma(m_pilot),
-    data = design_df
+  simulated_model <- makeLmer(
+    formula(pilot_model),
+    fixef(pilot_model),
+    VarCorr(pilot_model),
+    sigma(pilot_model),
+    data = design_data
   )
   
-  term <- get_interaction_term(m_sim)
+  interaction_term <- get_interaction_term(simulated_model)
   
   powerSim(
-    m_sim,
-    test = fixed(term, method="t"),  # Satterthwaite via lmerTest
-    nsim = nsim,
+    simulated_model,
+    test = fixed(interaction_term, method="t"),  # Satterthwaite via lmerTest
+    nsim = n_simulations,
     fitOpts = list(control = lmerControl(optimizer="bobyqa"))
   )
 }
@@ -151,19 +151,19 @@ run_power_simr <- function(
 #' The Satterthwaite t-test (via lmerTest) is used for significance testing.
 #' The function prints the summary and plots the power curve.
 #'
-#' @param m_pilot A fitted pilot linear mixed model (from lmer).
+#' @param pilot_model A fitted pilot linear mixed model (from lmer).
 #' @param stim_label Character. Label for the target stimulus type (e.g., "PA" or "SED").
-#' @param N_seq Integer vector. Sequence of sample sizes (number of subjects) to test.
-#' @param nsim Integer. Number of simulations per sample size (default: 1000).
+#' @param sample_sizes Integer vector. Sequence of sample sizes (number of subjects) to test.
+#' @param n_simulations Integer. Number of simulations per sample size (default: 1000).
 #' @param seed Integer. Random seed for reproducibility (default: 2001).
 #' @return A simr powerCurve object containing power estimates for each sample size.
 #' @examples
-#' pc <- run_power_curve(m_pilot, "SED", N_seq = seq(40, 120, by = 5), nsim = 1000, seed = 2001)
+#' power_curve_result <- run_power_curve(pilot_model, "SED", sample_sizes = seq(40, 120, by = 5), n_simulations = 1000, seed = 2001)
 run_power_curve <- function(
-    m_pilot,
+    pilot_model,
     stim_label,
-    N_seq,
-    nsim = 1000,
+    sample_sizes,
+    n_simulations = 1000,
     seed = 2001
 ){
   
@@ -173,33 +173,33 @@ run_power_curve <- function(
   cat("POWER CURVE —", stim_label, "vs NEU\n")
   cat("=============================\n")
   
-  design_df <- make_design_balanced(max(N_seq), stim_label)
+  design_data <- make_design_balanced(n_subjects = max(sample_sizes), stim_label = stim_label)
   
-  m_sim <- makeLmer(
-    formula(m_pilot),
-    fixef(m_pilot),
-    VarCorr(m_pilot),
-    sigma(m_pilot),
-    data = design_df
+  simulated_model <- makeLmer(
+    formula(pilot_model),
+    fixef(pilot_model),
+    VarCorr(pilot_model),
+    sigma(pilot_model),
+    data = design_data
   )
   
-  term <- get_interaction_term(m_sim)
+  interaction_term <- get_interaction_term(simulated_model)
   
-  m_ext <- extend(m_sim, along = "subject", n = max(N_seq))
+  extended_model <- extend(simulated_model, along = "subject", n = max(sample_sizes))
   
-  pc <- powerCurve(
-    m_ext,
-    test = fixed(term, method = "t"),   
+  power_curve_result <- powerCurve(
+    extended_model,
+    test = fixed(interaction_term, method = "t"),   
     along = "subject",
-    breaks = N_seq,
-    nsim = nsim,
+    breaks = sample_sizes,
+    nsim = n_simulations,
     fitOpts = list(control = lmerControl(optimizer="bobyqa"))
   )
   
-  print(summary(pc))
-  plot(pc)
+  print(summary(power_curve_result))
+  plot(power_curve_result)
   
-  pc
+  power_curve_result
 }
 
 #' Refine sample size estimation by re-simulation around the power threshold
@@ -210,102 +210,102 @@ run_power_curve <- function(
 #' the target power. Results are printed and returned as a list.
 #'
 #' @param power_curve_obj A simr powerCurve object (from run_power_curve).
-#' @param m_pilot A fitted pilot linear mixed model (from lmer).
+#' @param pilot_model A fitted pilot linear mixed model (from lmer).
 #' @param stim_label Character. Label for the target stimulus type (e.g., "PA" or "SED").
 #' @param target_power Numeric. Desired power threshold (default: 0.90).
-#' @param nsim_refine Integer. Number of simulations per sample size for refinement (default: 1000).
-#' @param seed_base Integer. Base random seed for reproducibility (default: 9000).
+#' @param n_simulations_refine Integer. Number of simulations per sample size for refinement (default: 1000).
+#' @param base_seed Integer. Base random seed for reproducibility (default: 9000).
 #' @return A list with the exact sample size, summary tables, and interval.
 #' @examples
-#' res <- refine_N_by_resimulation(pc, m_pilot, "SED", target_power = 0.90, nsim_refine = 1000)
+#' result <- refine_N_by_resimulation(power_curve_result, pilot_model, "SED", target_power = 0.90, n_simulations_refine = 1000)
 refine_N_by_resimulation <- function(
     power_curve_obj,
-    m_pilot,
+    pilot_model,
     stim_label,
     target_power = 0.90,
-    nsim_refine = 1000,
-    seed_base = 9000
+    n_simulations_refine = 1000,
+    base_seed = 9000
 ){
   
-  tab <- as.data.frame(summary(power_curve_obj))
+  power_summary <- as.data.frame(summary(power_curve_obj))
   
-  if(!("subjects" %in% names(tab)) && ("nlevels" %in% names(tab))){
-    tab$subjects <- tab$nlevels
+  if(!("subjects" %in% names(power_summary)) && ("nlevels" %in% names(power_summary))){
+    power_summary$subjects <- power_summary$nlevels
   }
   
-  if(!("power" %in% names(tab)) && ("mean" %in% names(tab))){
-    tab$power <- tab$mean
+  if(!("power" %in% names(power_summary)) && ("mean" %in% names(power_summary))){
+    power_summary$power <- power_summary$mean
   }
   
-  stopifnot("subjects" %in% names(tab), "power" %in% names(tab))
+  stopifnot("subjects" %in% names(power_summary), "power" %in% names(power_summary))
   
-  tab <- tab[order(tab$subjects), ]
+  power_summary <- power_summary[order(power_summary$subjects), ]
   
-  if(max(tab$power, na.rm=TRUE) < target_power){
+  if(max(power_summary$power, na.rm=TRUE) < target_power){
     cat("\n⚠️  Target power not achieved in the tested range.\n")
-    return(list(N_exact = NA, tab = tab, refine_tab = NULL,
-                N_lo = NA, N_hi = NA))
+    return(list(n_exact = NA, power_summary = power_summary, refinement_table = NULL,
+                n_lower = NA, n_upper = NA))
   }
   
-  idx_hi <- which(tab$power >= target_power)[1]
-  idx_lo <- idx_hi - 1
+  index_above <- which(power_summary$power >= target_power)[1]
+  index_below <- index_above - 1
   
-  if(tab$power[idx_hi] == target_power){
-    N_exact <- tab$subjects[idx_hi]
-    cat("\n✅ N exact = ", N_exact, " n", sep="")
-    return(list(N_exact = N_exact, tab = tab, refine_tab = NULL,
-                N_lo = N_exact, N_hi = N_exact))
+  if(power_summary$power[index_above] == target_power){
+    n_exact <- power_summary$subjects[index_above]
+    cat("\n✅ N exact = ", n_exact, " n", sep="")
+    return(list(n_exact = n_exact, power_summary = power_summary, refinement_table = NULL,
+                n_lower = n_exact, n_upper = n_exact))
   }
   
-  N_lo <- tab$subjects[idx_lo]; p_lo <- tab$power[idx_lo]
-  N_hi <- tab$subjects[idx_hi]; p_hi <- tab$power[idx_hi]
+  n_lower <- power_summary$subjects[index_below]; power_at_lower <- power_summary$power[index_below]
+  n_upper <- power_summary$subjects[index_above]; power_at_upper <- power_summary$power[index_above]
   
   cat("\nDetected framing (power curve) :\n")
-  cat("  N =", N_lo, " → power_mean =", round(p_lo,4), "\n")
-  cat("  N =", N_hi, " → power_mean =", round(p_hi,4), "\n")
-  cat("\n🔁 SIMR RE-SIMULATION in steps of 1 between ", N_lo, " and ", N_hi, "...\n", sep="")
+  cat("  N =", n_lower, " → power_mean =", round(power_at_lower,4), "\n")
+  cat("  N =", n_upper, " → power_mean =", round(power_at_upper,4), "\n")
+  cat("\n🔁 SIMR RE-SIMULATION in steps of 1 between ", n_lower, " and ", n_upper, "...\n", sep="")
   
-  extract_power_from_powersim <- function(ps_obj){
-    s <- summary(ps_obj)
-    p  <- if("power" %in% names(s)) as.numeric(s[["power"]]) else
-      if("mean"  %in% names(s)) as.numeric(s[["mean"]])  else NA_real_
-    lo <- if("lower" %in% names(s)) as.numeric(s[["lower"]]) else NA_real_
-    hi <- if("upper" %in% names(s)) as.numeric(s[["upper"]]) else NA_real_
-    list(power = p, lower = lo, upper = hi)
+  extract_power_from_powersim <- function(power_sim_object){
+    sim_summary <- summary(power_sim_object)
+    estimated_power  <- if("power" %in% names(sim_summary)) as.numeric(sim_summary[["power"]]) else
+      if("mean"  %in% names(sim_summary)) as.numeric(sim_summary[["mean"]])  else NA_real_
+    ci_lower <- if("lower" %in% names(sim_summary)) as.numeric(sim_summary[["lower"]]) else NA_real_
+    ci_upper <- if("upper" %in% names(sim_summary)) as.numeric(sim_summary[["upper"]]) else NA_real_
+    list(power = estimated_power, lower = ci_lower, upper = ci_upper)
   }
   
-  N_grid <- seq(N_lo, N_hi, by = 1)
-  refine_rows <- vector("list", length(N_grid))
+  sample_size_grid <- seq(n_lower, n_upper, by = 1)
+  refinement_results <- vector("list", length(sample_size_grid))
   
-  for(i in seq_along(N_grid)){
-    N_i <- N_grid[i]
-    seed_i <- seed_base + N_i
+  for(i in seq_along(sample_size_grid)){
+    n_current <- sample_size_grid[i]
+    current_seed <- base_seed + n_current
     
-    ps <- run_power_simr(m_pilot, stim_label, N = N_i, nsim = nsim_refine, seed = seed_i)
-    ex <- extract_power_from_powersim(ps)
+    power_result <- run_power_simr(pilot_model, stim_label, n_subjects = n_current, n_simulations = n_simulations_refine, seed = current_seed)
+    extracted_power <- extract_power_from_powersim(power_result)
     
-    refine_rows[[i]] <- data.frame(
-      subjects = N_i,
-      power = ex$power,
-      lower = ex$lower,
-      upper = ex$upper
+    refinement_results[[i]] <- data.frame(
+      subjects = n_current,
+      power = extracted_power$power,
+      lower = extracted_power$lower,
+      upper = extracted_power$upper
     )
     
-    cat("  N=", N_i, " → power_mean=", round(ex$power,4),
-        " [", round(ex$lower,4), ", ", round(ex$upper,4), "]\n", sep="")
+    cat("  N=", n_current, " → power_mean=", round(extracted_power$power,4),
+        " [", round(extracted_power$lower,4), ", ", round(extracted_power$upper,4), "]\n", sep="")
   }
   
-  refine_tab <- bind_rows(refine_rows)
+  refinement_table <- bind_rows(refinement_results)
   
-  idx <- which(refine_tab$power >= target_power)[1]
-  if(is.na(idx)){
+  index_target_reached <- which(refinement_table$power >= target_power)[1]
+  if(is.na(index_target_reached)){
     cat("\n⚠️  Even after refinement, the target is not achieved.\n")
-    N_exact <- NA
+    n_exact <- NA
   } else {
-    N_exact <- refine_tab$subjects[idx]
-    cat("\n✅ N exact (re-simulated) for power_mean  ", target_power*100, "% = ", N_exact, "\n", sep="")
+    n_exact <- refinement_table$subjects[index_target_reached]
+    cat("\n✅ N exact (re-simulated) for power_mean  ", target_power*100, "% = ", n_exact, "\n", sep="")
   }
   
-  list(N_exact = N_exact, tab = tab, refine_tab = refine_tab,
-       N_lo = N_lo, N_hi = N_hi)
+  list(n_exact = n_exact, power_summary = power_summary, refinement_table = refinement_table,
+       n_lower = n_lower, n_upper = n_upper)
 }
