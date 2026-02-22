@@ -18,20 +18,20 @@ source("R/02_functions_plots.R")
 options(repos = c(CRAN = "https://cloud.r-project.org"))
 
 packages <- c("plyr", "dplyr", "lme4", "lmerTest", "simr")
-to_install <- packages[!(packages %in% installed.packages()[,"Package"])]
-if(length(to_install)) install.packages(to_install)
+packages_to_install <- packages[!(packages %in% installed.packages()[,"Package"])]
+if(length(packages_to_install)) install.packages(packages_to_install)
 invisible(lapply(packages, library, character.only = TRUE))
 
 # Ensure simr uses Satterthwaite df via lmerTest for method="t"
 simr::simrOptions(lmerTestDdf = "Satterthwaite")
 
-path_dir <- file.path("/Users/timotheedumas/Documents/University/UOttawa/Recherche/RR_Validation_KAAT/2018_cheval_code_and_data")
-raw_file <- file.path(path_dir, "raw_data_eprime_zen.csv")
+data_directory <- file.path("/Users/timotheedumas/Documents/University/UOttawa/Recherche/RR_Validation_KAAT/2018_cheval_code_and_data")
+raw_data_filepath <- file.path(data_directory, "raw_data_eprime_zen.csv")
 
 ############################################################
 ## 1) LOAD RAW DATA
 ############################################################
-img_sets <- get_image_sets()
+image_sets <- get_image_sets()
 
 ############################################################
 ## 2) IMAGE LISTS — same as Cheval
@@ -39,13 +39,13 @@ img_sets <- get_image_sets()
 ## - 5 SED targets
 ## - 20 neutral files (10 scenes × 2 versions r/c)
 ############################################################
-neutral_all <- c(img_sets$neutral_r, img_sets$neutral_c)
+all_neutral_images <- c(image_sets$neutral_r, image_sets$neutral_c)
 
-data_main <- load_raw_data(raw_file) %>%
+preprocessed_data <- load_raw_data(raw_data_filepath) %>%
   ############################################################
   ## 3) RECODING Stimuli — only used to reconstruct Movement
   ############################################################
-  recode_stimuli(img_sets) %>%
+  recode_stimuli(image_sets) %>%
 
   ############################################################
   ## 4) RECODING Movement (Approach/Avoid) — Cheval mapping (compat/incomp)
@@ -66,15 +66,15 @@ data_main <- load_raw_data(raw_file) %>%
   ## - neutral: NEU_<filename_without_extension>
   ## - targets: TGT_<filename_without_extension>
   ############################################################
-  create_item_ids(neutral_all)
+  create_item_ids(all_neutral_images)
 
 ############################################################
 ## 7) DATASETS FOR THE TWO MODELS
 ############################################################
-dat_sed <- create_stimulus_dataset(
-    data_main,
-    img_sets$SB,
-    neutral_all,
+data_sedentary <- create_stimulus_dataset(
+    preprocessed_data,
+    image_sets$SB,
+    all_neutral_images,
     "SED"
 ) %>%
 ############################################################
@@ -85,10 +85,10 @@ set_coding_pm05(c("NEU", "SED"))
 ############################################################
 ## 7) DATASETS FOR THE TWO MODELS
 ############################################################
-dat_pa <- create_stimulus_dataset(
-  data_main,
-  img_sets$PA,
-  neutral_all,
+data_physical_activity <- create_stimulus_dataset(
+  preprocessed_data,
+  image_sets$PA,
+  all_neutral_images,
   "PA"
 ) %>%
 ############################################################
@@ -99,8 +99,8 @@ set_coding_pm05(c("NEU", "PA"))
 ############################################################
 ## 8) SANITY CHECKS 
 ############################################################
-run_sanity_checks(dat_sed, "SED")
-run_sanity_checks(dat_pa, "PA")
+run_sanity_checks(data_sedentary, "SED")
+run_sanity_checks(data_physical_activity, "PA")
 
 
 
@@ -117,31 +117,31 @@ run_sanity_checks(dat_pa, "PA")
 ## 1A) Pilot models
 ############################################################
 
-m_sed_main <- lmer(
+model_sedentary <- lmer(
   RT ~ Movement * StimulusType + (1 + Movement | subject) + (1|item),
-  data = dat_sed,
+  data = data_sedentary,
   REML = FALSE,
   control = lmerControl(optimizer = "bobyqa")
 )
 
-m_pa_main <- lmer(
+model_physical_activity <- lmer(
   RT ~ Movement * StimulusType + (1 + Movement | subject) + (1|item),
-  data = dat_pa,
+  data = data_physical_activity,
   REML = FALSE,
   control = lmerControl(optimizer = "bobyqa")
 )
 
 cat("\n===== MAIN PILOT LMM: SED vs NEU =====\n")
-print(summary(m_sed_main))
-cat("\nSingular fit (SED main)? ", isSingular(m_sed_main, tol = 1e-5), "\n")
+print(summary(model_sedentary))
+cat("\nSingular fit (SED main)? ", isSingular(model_sedentary, tol = 1e-5), "\n")
 cat("\nVarCorr (SED main):\n")
-print(VarCorr(m_sed_main))
+print(VarCorr(model_sedentary))
 
 cat("\n===== MAIN PILOT LMM: PA vs NEU =====\n")
-print(summary(m_pa_main))
-cat("\nSingular fit (PA main)? ", isSingular(m_pa_main, tol = 1e-5), "\n")
+print(summary(model_physical_activity))
+cat("\nSingular fit (PA main)? ", isSingular(model_physical_activity, tol = 1e-5), "\n")
 cat("\nVarCorr (PA main):\n")
-print(VarCorr(m_pa_main))
+print(VarCorr(model_physical_activity))
 
 ############################################################
 ## 1B) Residual diagnostics (raw RTs)
@@ -149,8 +149,8 @@ print(VarCorr(m_pa_main))
 ## (QQ-plot + residuals vs fitted)
 ############################################################
 
-diagnose_residuals(m_sed_main, "SED vs NEU (pilot)")
-diagnose_residuals(m_pa_main,  "PA vs NEU (pilot)")
+diagnose_residuals(model_sedentary, "SED vs NEU (pilot)")
+diagnose_residuals(model_physical_activity,  "PA vs NEU (pilot)")
 
 ############################################################
 ## NOTE (-0.5/+0.5 coding)
@@ -196,11 +196,24 @@ diagnose_residuals(m_pa_main,  "PA vs NEU (pilot)")
 ## 2C) POWER at N=90 — nsim=1000
 ############################################################
 
-power90_sed <- run_power_simr(m_sed_main, "SED", n_subjects = 90, n_simulations = 1000, seed = 1001)
-power90_pa  <- run_power_simr(m_pa_main,  "PA",  n_subjects = 90, n_simulations = 1000, seed = 1002)
+power_n90_sedentary <- run_power_simr(
+  model_sedentary,
+  "SED",
+  n_subjects = 90,
+  n_simulations = 1000,
+  seed = 1001
+)
 
-power90_sed
-power90_pa
+power_n90_physical_activity <- run_power_simr(
+  model_physical_activity,
+  "PA",
+  n_subjects = 90,
+  n_simulations = 1000,
+  seed = 1002
+)
+
+power_n90_sedentary
+power_n90_physical_activity
 
 
 
@@ -223,15 +236,15 @@ sample_sizes         <- seq(20, 60, by = 5)
 ## Run the curves (distinct seeds)
 ############################################################
 
-pc_sed <- run_power_curve(
-    m_sed_main,
+power_curve_sedentary <- run_power_curve(
+    model_sedentary,
     "SED",
     sample_sizes = sample_sizes,
     n_simulations = n_simulations_curve,
     seed = 3001
 )
-pc_pa  <- run_power_curve(
-    m_pa_main,
+power_curve_physical_activity <- run_power_curve(
+    model_physical_activity,
     "PA",
     sample_sizes = sample_sizes,
     n_simulations = n_simulations_curve,
@@ -266,9 +279,9 @@ pc_pa  <- run_power_curve(
 ############################################################
 
 cat("\n=============================\nSED vs NEU\n=============================\n")
-res_sed <- refine_N_by_resimulation(
-  power_curve_obj = pc_sed,
-  pilot_model = m_sed_main,
+refinement_sedentary <- refine_N_by_resimulation(
+  power_curve_obj = power_curve_sedentary,
+  pilot_model = model_sedentary,
   stim_label = "SED",
   target_power = 0.90,
   n_simulations_refine = 1000,
@@ -276,9 +289,9 @@ res_sed <- refine_N_by_resimulation(
 )
 
 cat("\n=============================\nPA vs NEU\n=============================\n")
-res_pa <- refine_N_by_resimulation(
-  power_curve_obj = pc_pa,
-  pilot_model = m_pa_main,
+refinement_physical_activity <- refine_N_by_resimulation(
+  power_curve_obj = power_curve_physical_activity,
+  pilot_model = model_physical_activity,
   stim_label = "PA",
   target_power = 0.90,
   n_simulations_refine = 1000,
@@ -286,8 +299,8 @@ res_pa <- refine_N_by_resimulation(
 )
 
 cat("\n=============================\nFINAL SUMMARY\n=============================\n")
-cat("SED  N90 =", res_sed$n_exact, "\n")
-cat("PA   N90 =", res_pa$n_exact,  "\n")
+cat("SED  N90 =", refinement_sedentary$n_exact, "\n")
+cat("PA   N90 =", refinement_physical_activity$n_exact,  "\n")
 
 ############################################################
 ## 4) Figures (one per model) — DISPLAY STEP OF 5 + exact N
@@ -295,14 +308,14 @@ cat("PA   N90 =", res_pa$n_exact,  "\n")
 
 par(mfrow = c(1, 2))
 plot_power_curve_step5_with_Nexact(
-    res_sed$power_summary,
-    res_sed$n_exact,
+    refinement_sedentary$power_summary,
+    refinement_sedentary$n_exact,
     stim_label = "SED",
     target_power = 0.90)
 
 plot_power_curve_step5_with_Nexact(
-    res_pa$power_summary,
-    res_pa$n_exact,
+    refinement_physical_activity$power_summary,
+    refinement_physical_activity$n_exact,
     stim_label = "PA",
     target_power = 0.90)
 par(mfrow = c(1, 1))
@@ -324,17 +337,17 @@ par(mfrow = c(1, 1))
 ## Export to PDF
 ############################################################
 
-pdf(paste0(path_dir, "/power curves.pdf"), width = 10, height = 4)
+pdf(paste0(data_directory, "/power curves.pdf"), width = 10, height = 4)
 par(mfrow = c(1, 2))
 plot_power_curve_step5_with_Nexact(
-    res_sed$power_summary,
-    res_sed$n_exact,
+    refinement_sedentary$power_summary,
+    refinement_sedentary$n_exact,
     stim_label = "SED",
     target_power = 0.90
 )
 plot_power_curve_step5_with_Nexact(
-    res_pa$power_summary,
-    res_pa$n_exact,
+    refinement_physical_activity$power_summary,
+    refinement_physical_activity$n_exact,
     stim_label = "PA",
     target_power = 0.90
 )
