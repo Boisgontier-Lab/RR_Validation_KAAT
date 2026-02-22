@@ -11,6 +11,8 @@ rm(list=ls())
 ## 0) INSTALL & LOAD PACKAGES, SET THE PATH
 ############################################################
 
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+
 packages <- c("plyr", "dplyr", "lme4", "lmerTest", "simr")
 to_install <- packages[!(packages %in% installed.packages()[,"Package"])]
 if(length(to_install)) install.packages(to_install)
@@ -19,6 +21,7 @@ invisible(lapply(packages, library, character.only = TRUE))
 # Ensure simr uses Satterthwaite df via lmerTest for method="t"
 simr::simrOptions(lmerTestDdf = "Satterthwaite")
 
+# Récupérer dynamiquement le chemin du dossier contenant les données et les scripts
 path_dir <- # INSERT YOUR PATH HERE
 raw_file <- file.path(path_dir, "raw_data_eprime_zen.csv")
 
@@ -274,6 +277,7 @@ diagnose_residuals(m_pa_main,  "PA vs NEU (pilot)")
 ##
 ## check: nrow(df) == 144*N
 ############################################################
+
 make_design_balanced <- function(N, stim_label){
   
   neu_levels <- paste0("NEU_", 1:20)  
