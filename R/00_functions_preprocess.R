@@ -63,8 +63,8 @@ recode_stimuli <- function(dataMT, img_sets) {
   dataMT$Stimuli <- NA
   dataMT$Stimuli[dataMT$image %in% img_sets$PA] <- "physical_activity"
   dataMT$Stimuli[dataMT$image %in% img_sets$SB] <- "sedentary_behavior"
-  dataMT$Stimuli[dataMT$image %in% img_sets$neutral_c] <- "neutral_square"
   dataMT$Stimuli[dataMT$image %in% img_sets$neutral_r] <- "neutral_round"
+  dataMT$Stimuli[dataMT$image %in% img_sets$neutral_c] <- "neutral_square"
   dataMT$Stimuli <- factor(dataMT$Stimuli)
   dataMT
 }
