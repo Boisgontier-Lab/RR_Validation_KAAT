@@ -69,7 +69,7 @@ preprocessed_data <- load_raw_data(raw_data_filepath) %>%
   create_item_ids(all_neutral_images)
 
 ############################################################
-## 7) DATASETS FOR THE TWO MODELS
+## 7a) DATASETS FOR THE SED MODEL
 ############################################################
 data_sedentary <- create_stimulus_dataset(
     preprocessed_data,
@@ -78,12 +78,12 @@ data_sedentary <- create_stimulus_dataset(
     "SED"
 ) %>%
 ############################################################
-## 7bis) -0.5 / +0.5 CODING 
+## 7b) -0.5 / +0.5 CODING 
 ############################################################
 set_coding_pm05(c("NEU", "SED"))
 
 ############################################################
-## 7) DATASETS FOR THE TWO MODELS
+## 7c) DATASETS FOR THE PA MODEL
 ############################################################
 data_physical_activity <- create_stimulus_dataset(
   preprocessed_data,
@@ -92,7 +92,7 @@ data_physical_activity <- create_stimulus_dataset(
   "PA"
 ) %>%
 ############################################################
-## 7bis) -0.5 / +0.5 CODING 
+## 7d) -0.5 / +0.5 CODING 
 ############################################################
 set_coding_pm05(c("NEU", "PA"))
 
