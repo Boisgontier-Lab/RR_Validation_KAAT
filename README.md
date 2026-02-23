@@ -23,6 +23,7 @@ Code and data for the article: "Comparing the KINARM approach-avoidance task wit
 
 ## File Structure
 
+- `Figures_PDF/` : Independant figures files in vector PDF format. 
 - `analysis_scripts/` : MATLAB scripts for extracting and analyzing kinematic data from the KINARM approach-avoidance task (e.g., reaction time, maximum speed, maximum absolute deviation, initial direction, speed peaks, x-flips).
 - `manikin_and_kaat_demonstration_videos/` : Demonstration videos of the two tasks compared in the study (KINARM approach-avoidance task and manikin task).
 - `R/` : R scripts for preprocessing, statistical analysis (linear mixed models, simulation-based power analysis with `simr`), and visualization of the manikin task data from Cheval et al. (2018). The main entry point is `main.R`.
