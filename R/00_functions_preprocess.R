@@ -61,10 +61,10 @@ get_image_sets <- function() {
 #' @return The data frame with a new 'Stimuli' factor column.
 recode_stimuli <- function(dataMT, img_sets) {
   dataMT$Stimuli <- NA
-  dataMT$Stimuli[dataMT$image %in% img_sets$PA] <- "PA"
-  dataMT$Stimuli[dataMT$image %in% img_sets$SB] <- "SB"
-  dataMT$Stimuli[dataMT$image %in% img_sets$neutral_r] <- "stimuli_rond"
-  dataMT$Stimuli[dataMT$image %in% img_sets$neutral_c] <- "stimuli_carre"
+  dataMT$Stimuli[dataMT$image %in% img_sets$PA] <- "physical_activity"
+  dataMT$Stimuli[dataMT$image %in% img_sets$SB] <- "sedentary_behavior"
+  dataMT$Stimuli[dataMT$image %in% img_sets$neutral_c] <- "neutral_square"
+  dataMT$Stimuli[dataMT$image %in% img_sets$neutral_r] <- "neutral_round"
   dataMT$Stimuli <- factor(dataMT$Stimuli)
   dataMT
 }
@@ -77,22 +77,22 @@ recode_movement <- function(dataMT) {
   dataMT$groups <- interaction(factor(dataMT$Stimuli), factor(dataMT$Procedure.Trial.))
   
   mapping <- c(
-    "PA.compat1" = "Approach",
-    "PA.compat2" = "Approach",
-    "SB.compat1" = "Avoid",
-    "SB.compat2" = "Avoid",
-    "stimuli_carre.compat1" = "Avoid",
-    "stimuli_carre.compat2" = "Avoid",
-    "stimuli_rond.compat1" = "Approach",
-    "stimuli_rond.compat2" = "Approach",
-    "PA.incomp1" = "Avoid",
-    "PA.incomp2" = "Avoid",
-    "SB.incomp1" = "Approach",
-    "SB.incomp2" = "Approach",
-    "stimuli_carre.incomp1" = "Approach",
-    "stimuli_carre.incomp2" = "Approach",
-    "stimuli_rond.incomp1" = "Avoid",
-    "stimuli_rond.incomp2" = "Avoid"
+    "physical_activity.compat1" = "Approach",
+    "physical_activity.compat2" = "Approach",
+    "sedentary_behavior.compat1" = "Avoid",
+    "sedentary_behavior.compat2" = "Avoid",
+    "neutral_square.compat1" = "Avoid",
+    "neutral_square.compat2" = "Avoid",
+    "neutral_round.compat1" = "Approach",
+    "neutral_round.compat2" = "Approach",
+    "physical_activity.incomp1" = "Avoid",
+    "physical_activity.incomp2" = "Avoid",
+    "sedentary_behavior.incomp1" = "Approach",
+    "sedentary_behavior.incomp2" = "Approach",
+    "neutral_square.incomp1" = "Approach",
+    "neutral_square.incomp2" = "Approach",
+    "neutral_round.incomp1" = "Avoid",
+    "neutral_round.incomp2" = "Avoid"
   )
   
   dataMT$Movement <- plyr::revalue(as.character(dataMT$groups), mapping, warn_missing = FALSE)
