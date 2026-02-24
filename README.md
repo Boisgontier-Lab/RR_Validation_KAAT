@@ -7,18 +7,12 @@
 
 Code and data for the article: "Comparing the KINARM approach-avoidance task with the manikin task to measure automatic motivation: a registered report"
 
-## Installation
-
-1. Unzip `2018_cheval_code_and_data.zip`
-2. Copy the absolute path to the unzipped directory (e.g., `/Users/YourUserName/Documents/RR_Validation_KAAT/2018_cheval_code_and_data`)
-3. In `R/main.R` at line 28, paste the path:
-    ```r
-    path_dir <- file.path("/Users/YourUserName/Documents/RR_Validation_KAAT/2018_Cheval_code_and_data")
-    ```
-
 ## Usage
 
-1. Run `R/main.R`
+1. Run the following command :
+    ```sh
+    python3 main.py
+    ```
 2. Output plots will be saved to `Rplots.pdf`
 
 ## File Structure
