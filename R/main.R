@@ -25,7 +25,9 @@ invisible(lapply(packages, library, character.only = TRUE))
 # Ensure simr uses Satterthwaite df via lmerTest for method="t"
 simr::simrOptions(lmerTestDdf = "Satterthwaite")
 
-data_directory <- file.path("/Users/timotheedumas/Documents/University/UOttawa/Recherche/RR_Validation_KAAT/2018_cheval_code_and_data")
+env_lines <- readLines(".env")
+data_dir_line <- env_lines[grepl("^DATA_DIR=", env_lines)]
+data_directory <- sub("^DATA_DIR=", "", data_dir_line)
 raw_data_filepath <- file.path(data_directory, "raw_data_eprime_zen.csv")
 
 ############################################################
