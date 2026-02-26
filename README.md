@@ -1,5 +1,5 @@
 # RR_Validation_KAAT
-**Authors:** François Jabouille, Timothée Dumas, Jérémy Fortier, Michaël Patrick Robichaud, Brian Nhat Thien Nguyen, Frédérik Jolicoeur, Silvio Maltagliati, Boris Cheval, Kayne Park, Matthieu P. Boisgontier
+**Authors:** François Jabouille, Timothée Dumas, Kayne Park, Matthieu P. Boisgontier
 
 **Contact:** fjabouil@uottawa.ca
 
