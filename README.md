@@ -1,11 +1,11 @@
 # RR_Validation_KAAT
-**Authors:** François Jabouille, Timothée Dumas, Kayne Park, Matthieu P. Boisgontier
+**Authors:** François Jabouille, Timothée Dumas, Jérémt Fortier, Michaël Patrick Robichaud, Brian Nhat Thien Nguyen, Frédérik Jolicoeur, Silvio Maltagliati, Boris Cheval, Kayne Park, Matthieu P. Boisgontier
 
 **Contact:** francois.jabouille@uottawa.ca
 
 ## Description
 
-Code and data for the article: "Comparing the KINARM approach-avoidance task with the manikin task to measure automatic motivation: a registered report"
+Code and data for the article: "Validity of the Kinarm Approach-Avoidance Task for Assessing Automatic Tendencies Towards Physical Activity and Sedentary Behaviours: A Registered Report"
 
 ## Usage
 
@@ -22,6 +22,7 @@ Code and data for the article: "Comparing the KINARM approach-avoidance task wit
 - `manikin_and_kaat_demonstration_videos/` : Demonstration videos of the two tasks compared in the study (KINARM approach-avoidance task and manikin task).
 - `paper/` : Latest version of the manuscript.
 - `R/` : R scripts for preprocessing, statistical analysis (linear mixed models, simulation-based power analysis with `simr`), and visualization of the manikin task data from Cheval et al. (2018). The main entry point is `main.R`.
+- `supplemental_material/` : Supplemental material of the study.
 
 ## Source
 
