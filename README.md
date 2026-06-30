@@ -1,7 +1,7 @@
 # RR_Validation_KAAT
 **Authors:** François Jabouille, Timothée Dumas, Kayne Park, Matthieu P. Boisgontier
 
-**Contact:** fjabouil@uottawa.ca
+**Contact:** francois.jabouille@uottawa.ca
 
 ## Description
 
